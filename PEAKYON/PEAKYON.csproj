@@ -39,6 +39,9 @@
     <Reference Include="com.rlabrecque.steamworks.net">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PEAK\PEAK_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
     </Reference>
+    <Reference Include="my.pahsiv.MyLegDay">
+      <HintPath>..\..\..\..\Downloads\my.pahsiv.MyLegDay.dll</HintPath>
+    </Reference>
     <Reference Include="PEAKLobbyBrowser">
       <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\PEAK\profiles\Default\BepInEx\plugins\Isotope-PEAKLobbyBrowser\PEAKLobbyBrowser.dll</HintPath>
     </Reference>
