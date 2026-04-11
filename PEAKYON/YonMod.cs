@@ -1,4 +1,5 @@
 ﻿using BepInEx;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using MyLegDay;
@@ -7,10 +8,11 @@ using PEAKLib.UI.Elements;
 using Steamworks;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection.Emit;
 using TMPro;
 using UnityEngine;
+using UnityEngine.PlayerLoop;
 using UnityEngine.SceneManagement;
-using System.Reflection.Emit;
 
 namespace PEAKYON
 {
@@ -18,6 +20,15 @@ namespace PEAKYON
     [BepInDependency("com.github.PEAKModding.PEAKLib.UI")]
     public class YonMod : BaseUnityPlugin
     {
+        public static ConfigEntry<KeyCode> KickPatchToggleKey;
+        public static ConfigEntry<bool> enableSuperKick;
+        public static ConfigEntry<float> SuperKickForce;
+        public static ConfigEntry<float> SuperKickRange;
+        public static ConfigEntry<float> SuperKickRagdollTime;
+        public static ConfigEntry<float> SuperKickDistance;
+        public static ConfigEntry<float> SuperKickAngle;
+
+
         internal static new ManualLogSource Logger;
         //static bool isSearching;
         //static List<(CSteamID id, string name, int players, int max)> lobbies = new();
@@ -25,13 +36,27 @@ namespace PEAKYON
         //static PeakCustomPage serverBrowserPage;
         //static GameObject serverBrowserPageObj;
         //static PeakScrollableContent scrollableContent;
-
         private void Awake()
         {
             Logger = base.Logger;
             Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
+            KickPatchToggleKey = Config.Bind("SuperKick", "FastKickToggleKey", KeyCode.K, "Key to toggle the fast kick patch on/off.");
+            enableSuperKick = Config.Bind("SuperKick", "SuperKick Enable", true, "Toggle the super kick patch on/off.");
+            SuperKickForce = Config.Bind("SuperKick", "SuperKick Force", 50f, "The force of the SuperKick(default is 10).");
+            SuperKickRange = Config.Bind("SuperKick", "SuperKick Range", 3f, "The range of the SuperKick (default is 3).");
+            SuperKickRagdollTime = Config.Bind("SuperKick", "SuperKick Ragdoll Time", 1f, "How long the ragdoll effect lasts (default is 1).");
+            SuperKickDistance = Config.Bind("SuperKick", "SuperKick Distance", 1f, "The distance of the SuperKick (default is 1).");
+            SuperKickAngle = Config.Bind("SuperKick", "SuperKick Angle", 45f, "The angle of the SuperKick (default is 45).");
             new Harmony("com.yonij.lobbybrowser").PatchAll();
             //matchListResult = CallResult<LobbyMatchList_t>.Create(OnLobbyList);
+        }
+        private void Update()
+        {
+            if (Input.GetKeyDown(KickPatchToggleKey.Value))
+            {
+                enableSuperKick.Value = !enableSuperKick.Value;
+                Logger.LogInfo($"SuperKick: {(enableSuperKick.Value? "ON" : "OFF")}");
+            }
         }
         [HarmonyPatch(typeof(PEAKLobbyBrowser.PEAKLobbyBrowser), "Start")]
         public static class PatchPEAKLobbyBrowserStart
@@ -72,6 +97,34 @@ namespace PEAKYON
                 return codes;
             }
         }
+
+        //kick cooldown patch
+        [HarmonyPatch(typeof(CharacterGrabbing), "Update")]
+        public static class CharacterGrabbing_Update_Patch
+        {
+            [HarmonyPrefix]
+            public static bool Prefix(CharacterGrabbing __instance)
+            {
+                if (!YonMod.enableSuperKick.Value)
+                {
+                    //default values for kicks
+                    __instance.kickForce = 10f;
+                    __instance.kickRange = 3f;
+                    __instance.kickRagdollTime = 1f;
+                    __instance.kickDistance = 1f;
+                    __instance.kickAngle = 45f;
+                    return true;
+                }
+                __instance.kickForce = 500f;
+                var kickTime = Traverse.Create(__instance).Field<float>("_kickTime");
+                if (kickTime.Value < 0.6f)
+                {
+                    kickTime.Value = 0.6f;
+                }
+                return true;
+            }
+        }
+
 
         //betterkick patch
         //[HarmonyPatch(typeof(BetterKick.Plugin), "AllPlayersHaveMod")]
