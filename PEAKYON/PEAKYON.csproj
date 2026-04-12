@@ -30,6 +30,9 @@
     <Reference Include="Assembly-CSharp">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PEAK\PEAK_Data\Managed\Assembly-CSharp.dll</HintPath>
     </Reference>
+    <Reference Include="AtlasPeak">
+      <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\PEAK\profiles\Default\BepInEx\plugins\synq-Atlas\AtlasPeak.dll</HintPath>
+    </Reference>
     <Reference Include="com.atomic.betterkick">
       <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\PEAK\profiles\Default\BepInEx\plugins\AtomicStudio-Better_Kick\com.atomic.betterkick.dll</HintPath>
     </Reference>
@@ -44,6 +47,15 @@
     </Reference>
     <Reference Include="PEAKLobbyBrowser">
       <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\PEAK\profiles\Default\BepInEx\plugins\Isotope-PEAKLobbyBrowser\PEAKLobbyBrowser.dll</HintPath>
+    </Reference>
+    <Reference Include="PhotonUnityNetworking">
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PEAK\PEAK_Data\Managed\PhotonUnityNetworking.dll</HintPath>
+    </Reference>
+    <Reference Include="PhotonVoice">
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PEAK\PEAK_Data\Managed\PhotonVoice.dll</HintPath>
+    </Reference>
+    <Reference Include="PhotonVoice.PUN">
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PEAK\PEAK_Data\Managed\PhotonVoice.PUN.dll</HintPath>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PEAK\PEAK_Data\Managed\Unity.TextMeshPro.dll</HintPath>

@@ -5,9 +5,12 @@ using HarmonyLib;
 using MyLegDay;
 using PEAKLib.UI;
 using PEAKLib.UI.Elements;
+using Photon.Pun;
+using Photon.Voice.Unity;
 using Steamworks;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Reflection.Emit;
 using TMPro;
 using UnityEngine;
@@ -20,6 +23,7 @@ namespace PEAKYON
     [BepInDependency("com.github.PEAKModding.PEAKLib.UI")]
     public class YonMod : BaseUnityPlugin
     {
+        //super kick configs
         public static ConfigEntry<KeyCode> KickPatchToggleKey;
         public static ConfigEntry<bool> enableSuperKick;
         public static ConfigEntry<float> SuperKickForce;
@@ -27,26 +31,43 @@ namespace PEAKYON
         public static ConfigEntry<float> SuperKickRagdollTime;
         public static ConfigEntry<float> SuperKickDistance;
         public static ConfigEntry<float> SuperKickAngle;
+        
+        //talk as configs
+        public static ConfigEntry<KeyCode> TalkAsKey;
+        public static ConfigEntry<int> TalkAsPV;
+        public static ConfigEntry<bool> HearYourselfToggle;
 
+        //bugle configs
+        public static ConfigEntry<KeyCode> BuglePatchToggleKey;
+        public static ConfigEntry<bool> BuglePatchEnabled;
+        public static ConfigEntry<float> BuglePitchMin;
+        public static ConfigEntry<float> BuglePitchMax;
+        public static ConfigEntry<float> BugleVolume;
+        public static ConfigEntry<float> BuglePitchWobble;
 
         internal static new ManualLogSource Logger;
+
+        static int MyViewID;
         //static bool isSearching;
         //static List<(CSteamID id, string name, int players, int max)> lobbies = new();
         //static CallResult<LobbyMatchList_t> matchListResult;
         //static PeakCustomPage serverBrowserPage;
         //static GameObject serverBrowserPageObj;
         //static PeakScrollableContent scrollableContent;
+
         private void Awake()
         {
             Logger = base.Logger;
             Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
-            KickPatchToggleKey = Config.Bind("SuperKick", "FastKickToggleKey", KeyCode.K, "Key to toggle the fast kick patch on/off.");
-            enableSuperKick = Config.Bind("SuperKick", "SuperKick Enable", true, "Toggle the super kick patch on/off.");
-            SuperKickForce = Config.Bind("SuperKick", "SuperKick Force", 50f, "The force of the SuperKick(default is 10).");
-            SuperKickRange = Config.Bind("SuperKick", "SuperKick Range", 3f, "The range of the SuperKick (default is 3).");
-            SuperKickRagdollTime = Config.Bind("SuperKick", "SuperKick Ragdoll Time", 1f, "How long the ragdoll effect lasts (default is 1).");
-            SuperKickDistance = Config.Bind("SuperKick", "SuperKick Distance", 1f, "The distance of the SuperKick (default is 1).");
-            SuperKickAngle = Config.Bind("SuperKick", "SuperKick Angle", 45f, "The angle of the SuperKick (default is 45).");
+
+            Binds();
+            HearYourselfToggle.Value = false;
+            HearYourselfToggle.SettingChanged += (_, _) => HearYourself();
+            BuglePatchEnabled.Value = false;
+            BuglePatchEnabled.SettingChanged += (_, _) => Notification("Bugle Patch is " + (BuglePatchEnabled.Value ? "ON" : "OFF"));
+            enableSuperKick.SettingChanged += (_, _) => Notification("SuperKick is " + (enableSuperKick.Value ? "ON" : "OFF"));
+
+            TalkAsPV.SettingChanged += (_, _) => TalkAs(TalkAsPV.Value);
             new Harmony("com.yonij.lobbybrowser").PatchAll();
             //matchListResult = CallResult<LobbyMatchList_t>.Create(OnLobbyList);
         }
@@ -55,9 +76,21 @@ namespace PEAKYON
             if (Input.GetKeyDown(KickPatchToggleKey.Value))
             {
                 enableSuperKick.Value = !enableSuperKick.Value;
-                Logger.LogInfo($"SuperKick: {(enableSuperKick.Value? "ON" : "OFF")}");
             }
+            if (Input.GetKeyDown(BuglePatchToggleKey.Value))
+            {
+                BuglePatchEnabled.Value = !BuglePatchEnabled.Value;
+            }
+            //if (Input.GetKey(TalkAsKey.Value) && Character.localCharacter != null)
+            //{
+            //    TalkAs(TalkAsPV.Value);
+            //}
+            //if (Input.GetKeyUp(TalkAsKey.Value) && Character.localCharacter != null)
+            //{
+            //    Character.localCharacter.transform.GetChild(2).GetComponent<Recorder>().UserData = 0;
+            //}
         }
+
         [HarmonyPatch(typeof(PEAKLobbyBrowser.PEAKLobbyBrowser), "Start")]
         public static class PatchPEAKLobbyBrowserStart
         {
@@ -98,6 +131,42 @@ namespace PEAKYON
             }
         }
 
+
+        private void Binds()
+        {
+            KickPatchToggleKey = Config.Bind("SuperKick", "FastKickToggleKey", KeyCode.K, "Key to toggle the fast kick patch on/off.");
+            enableSuperKick = Config.Bind("SuperKick", "SuperKick Enable", true, "Toggle the super kick patch on/off.");
+            SuperKickForce = Config.Bind("SuperKick", "SuperKick Force", 50f,
+                new ConfigDescription("The force of the SuperKick. (default is 10)", new AcceptableValueRange<float>(-100f, 1500f)));
+            SuperKickRange = Config.Bind("SuperKick", "SuperKick Range", 3f,
+                new ConfigDescription("The range of the SuperKick. (default is 3)", new AcceptableValueRange<float>(0f, 1000f)));
+            SuperKickRagdollTime = Config.Bind("SuperKick", "SuperKick Ragdoll Time", 1f,
+                new ConfigDescription("How long the ragdoll effect lasts. (default is 1)", new AcceptableValueRange<float>(0f, 1000f)));
+            SuperKickDistance = Config.Bind("SuperKick", "SuperKick Distance", 1f,
+                new ConfigDescription("The distance of the SuperKick. (default is 1)", new AcceptableValueRange<float>(0f, 1000f)));
+            SuperKickAngle = Config.Bind("SuperKick", "SuperKick Angle", 45f,
+                new ConfigDescription("The angle of the SuperKick. (default is 45)", new AcceptableValueRange<float>(0f, 360f)));
+            TalkAsKey = Config.Bind("TalkAs", "TalkAsKey", KeyCode.T, "Key to talk as another player (hold while talking).");
+            TalkAsPV = Config.Bind("TalkAs", "TalkAs", 0, "Talk As Object.");
+            HearYourselfToggle = Config.Bind("TalkAs", "HearYourself", false, "Whether to hear your own voice when using Talk As.");
+
+            BuglePitchMin = Config.Bind("Bugle", "Pitch Min", 0.7f,
+                new ConfigDescription("Minimum pitch of the bugle. (default: 0.7)", new AcceptableValueRange<float>(0f, 5f)));
+
+            BuglePitchMax = Config.Bind("Bugle", "Pitch Max", 1.3f,
+                new ConfigDescription("Maximum pitch of the bugle. (default: 1.3)", new AcceptableValueRange<float>(0f, 5f)));
+
+            BugleVolume = Config.Bind("Bugle", "Volume", 0.35f,
+                new ConfigDescription("Volume of the bugle. (default: 0.35)", new AcceptableValueRange<float>(0f, 1f)));
+
+            BuglePitchWobble = Config.Bind("Bugle", "Pitch Wobble", 0f,
+                new ConfigDescription("Pitch wobble of the bugle. (default: 0)", new AcceptableValueRange<float>(0f, 1f)));
+
+
+            BuglePatchEnabled = Config.Bind("Bugle", "Bugle Patch Enabled", true, "Toggle the bugle patch on/off.");
+            BuglePatchToggleKey = Config.Bind("Bugle", "Bugle Patch Toggle Key", KeyCode.Backslash, "Key to toggle the bugle patch on/off.");
+            
+        }
         //kick cooldown patch
         [HarmonyPatch(typeof(CharacterGrabbing), "Update")]
         public static class CharacterGrabbing_Update_Patch
@@ -125,6 +194,90 @@ namespace PEAKYON
             }
         }
 
+        //[HarmonyPatch(typeof(Atlas.Plugin), "FixedUpdate")]
+        //public static class PatchAtlasUpdate
+        //{
+        //    static bool Prefix()
+        //    {
+        //        return false; // skip original
+        //    }
+        //}
+        public static void Notification(string message, string color = "FFFFFF", bool sound = false)
+        {
+            PlayerConnectionLog connectionLog = Object.FindAnyObjectByType<PlayerConnectionLog>();
+            if (connectionLog == null)
+            {
+                return;
+            }
+            string formattedMessage = string.Concat(new string[] { "<color=#", color, ">", message, "</color>" });
+            MethodInfo addMessageMethod = typeof(PlayerConnectionLog).GetMethod("AddMessage", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (addMessageMethod != null)
+            {
+                addMessageMethod.Invoke(connectionLog, new object[] { formattedMessage });
+                if (connectionLog.sfxJoin != null && sound)
+                {
+                    connectionLog.sfxJoin.Play(default(Vector3));
+                    return;
+                }
+            }
+            else
+            {
+                Logger.LogMessage("AddMessage method not found.");
+            }
+        }
+        //talk As photonview Id
+        public static void TalkAs(int ViewID)
+        {
+            Recorder recorder = Character.localCharacter.transform.GetChild(2).GetComponent<Recorder>();
+            if (MyViewID == 0)
+            {
+                MyViewID = int.TryParse(recorder.UserData.ToString(), out int id) ? id : 0;
+                if (MyViewID == 0)
+                {
+                    YonMod.Notification("Error: Could not get your ViewID. Talk As may not work correctly.", "FF0000", true);
+                }
+            }
+            recorder.UserData = ViewID;
+        }
+        
+        public static void HearYourself()
+        {
+            Recorder recorder = Character.localCharacter.transform.GetChild(2).GetComponent<Recorder>();
+            recorder.DebugEchoMode = HearYourselfToggle.Value;
+            Notification("HearYourself is " + (HearYourselfToggle.Value ? "ON" : "OFF"));
+        }
+        //bugle Patch
+        public static void buglePatch(Item item)
+        {
+            if (!BuglePatchEnabled.Value) return;
+
+            BugleSFX bugleSFX = item.GetComponent<BugleSFX>();
+            if (bugleSFX == null) return;
+
+            bugleSFX.pitchMin = BuglePitchMin.Value;
+            bugleSFX.pitchMax = BuglePitchMax.Value;
+            bugleSFX.volume = BugleVolume.Value;
+            bugleSFX.pitchWobble = BuglePitchWobble.Value;
+
+            YonMod.Notification("You patched the bugle! 🎺", "FFD700", true);
+        }
+        [HarmonyPatch(typeof(CharacterData), nameof(CharacterData.currentItem), MethodType.Setter)]
+        public static class CurrentItemPatch
+        {
+            [HarmonyPostfix]
+            static void Postfix(CharacterData __instance, Item value)
+            {
+                if (value == null) return;
+                if (!__instance.GetComponent<Character>().IsLocal) return;
+
+                //YonMod.Notification($"Picked up {value.UIData.itemName}", "FFD700", true);
+
+                if (value.UIData.itemName.ToLower().Contains("bugle"))
+                {
+                    buglePatch(value);
+                }
+            }
+        }
 
         //betterkick patch
         //[HarmonyPatch(typeof(BetterKick.Plugin), "AllPlayersHaveMod")]
