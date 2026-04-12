@@ -12,6 +12,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using TMPro;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
@@ -65,14 +66,20 @@ namespace PEAKYON
             HearYourselfToggle.SettingChanged += (_, _) => HearYourself();
             BuglePatchEnabled.Value = false;
             BuglePatchEnabled.SettingChanged += (_, _) => Notification("Bugle Patch is " + (BuglePatchEnabled.Value ? "ON" : "OFF"));
-            enableSuperKick.SettingChanged += (_, _) => Notification("SuperKick is " + (enableSuperKick.Value ? "ON" : "OFF"));
+            enableSuperKick.SettingChanged += (_, _) => SuperKick();
 
             TalkAsPV.SettingChanged += (_, _) => TalkAs(TalkAsPV.Value);
             new Harmony("com.yonij.lobbybrowser").PatchAll();
+            if (BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey("synq.peak.atlas"))
+            {
+                HookAtlas();
+            }
             //matchListResult = CallResult<LobbyMatchList_t>.Create(OnLobbyList);
         }
         private void Update()
         {
+            if (GUIManager.instance.windowBlockingInput) return; //no keypress when typing in chat or using menus
+
             if (Input.GetKeyDown(KickPatchToggleKey.Value))
             {
                 enableSuperKick.Value = !enableSuperKick.Value;
@@ -104,6 +111,23 @@ namespace PEAKYON
         [HarmonyPatch(typeof(CharacterGrabbing), nameof(CharacterGrabbing.KickCast))]
         static class Patch_KickCast_NoStamina
         {
+            [HarmonyPrefix]
+            private static bool Prefix(CharacterGrabbing __instance)
+            {
+                if (!YonMod.enableSuperKick.Value) return true;
+
+                // only local player
+                if (!__instance.GetComponent<Character>().photonView.IsMine) return true;
+
+                __instance.kickForce = YonMod.SuperKickForce.Value;
+                __instance.kickRange = YonMod.SuperKickRange.Value;
+                __instance.kickRagdollTime = YonMod.SuperKickRagdollTime.Value;
+                __instance.kickDistance = YonMod.SuperKickDistance.Value;
+                __instance.kickAngle = YonMod.SuperKickAngle.Value;
+
+                return true; // let KickCast still run
+            }
+
             static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
             {
                 var useStamina = AccessTools.Method(typeof(Character), "UseStamina");
@@ -167,6 +191,7 @@ namespace PEAKYON
             BuglePatchToggleKey = Config.Bind("Bugle", "Bugle Patch Toggle Key", KeyCode.Backslash, "Key to toggle the bugle patch on/off.");
             
         }
+
         //kick cooldown patch
         [HarmonyPatch(typeof(CharacterGrabbing), "Update")]
         public static class CharacterGrabbing_Update_Patch
@@ -174,17 +199,7 @@ namespace PEAKYON
             [HarmonyPrefix]
             public static bool Prefix(CharacterGrabbing __instance)
             {
-                if (!YonMod.enableSuperKick.Value)
-                {
-                    //default values for kicks
-                    __instance.kickForce = 10f;
-                    __instance.kickRange = 3f;
-                    __instance.kickRagdollTime = 1f;
-                    __instance.kickDistance = 1f;
-                    __instance.kickAngle = 45f;
-                    return true;
-                }
-                __instance.kickForce = 500f;
+                if (!YonMod.enableSuperKick.Value) return true; // if SuperKick is not enabled, run the original method
                 var kickTime = Traverse.Create(__instance).Field<float>("_kickTime");
                 if (kickTime.Value < 0.6f)
                 {
@@ -194,14 +209,6 @@ namespace PEAKYON
             }
         }
 
-        //[HarmonyPatch(typeof(Atlas.Plugin), "FixedUpdate")]
-        //public static class PatchAtlasUpdate
-        //{
-        //    static bool Prefix()
-        //    {
-        //        return false; // skip original
-        //    }
-        //}
         public static void Notification(string message, string color = "FFFFFF", bool sound = false)
         {
             PlayerConnectionLog connectionLog = Object.FindAnyObjectByType<PlayerConnectionLog>();
@@ -240,6 +247,25 @@ namespace PEAKYON
             recorder.UserData = ViewID;
         }
         
+        public static void SuperKick()
+        {
+            if (Character.localCharacter == null) return;
+
+            CharacterGrabbing characterGrabbing = Character.localCharacter.GetComponent<CharacterGrabbing>();
+            if (YonMod.enableSuperKick.Value)
+            {
+                Notification("Super Kick Activated! 🦶", "FF4500", true);
+                return;
+            }
+            //default values for kicks
+            characterGrabbing.kickForce = 10f;
+            characterGrabbing.kickRange = 3f;
+            characterGrabbing.kickRagdollTime = 1f;
+            characterGrabbing.kickDistance = 1f;
+            characterGrabbing.kickAngle = 45f;
+            Notification("Super Kick Deactivated! 👢", "FF4500", true);
+
+        }
         public static void HearYourself()
         {
             Recorder recorder = Character.localCharacter.transform.GetChild(2).GetComponent<Recorder>();
@@ -279,17 +305,16 @@ namespace PEAKYON
             }
         }
 
-        //betterkick patch
-        //[HarmonyPatch(typeof(BetterKick.Plugin), "AllPlayersHaveMod")]
-        //public static class PatchAllPlayersHaveMod
-        //{
-        //    static bool Prefix(ref bool __result)
-        //    {
-        //        __result = true;
-        //        Logger.LogInfo("BetterKick bypassed");
-        //        return false; // skip original
-        //    }
-        //}
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void HookAtlas()
+        {
+            var harmony = new Harmony("com.yonij.lobbybrowser");
+            harmony.Patch(
+                AccessTools.Method(typeof(Atlas.Plugin), "FixedUpdate"),
+                prefix: new HarmonyMethod(typeof(PatchAtlasUpdate), nameof(PatchAtlasUpdate.Prefix))
+            );
+        }
+
 
         //private void OnEnable()
         //{
@@ -515,5 +540,12 @@ namespace PEAKYON
 
         //    RefreshLobbyUI();
         //}
+    }
+}
+public static class PatchAtlasUpdate
+{
+    public static bool Prefix()
+    {
+        return false;
     }
 }
