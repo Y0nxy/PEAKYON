@@ -78,7 +78,7 @@ namespace PEAKYON
         }
         private void Update()
         {
-            if (GUIManager.instance.windowBlockingInput) return; //no keypress when typing in chat or using menus
+            if (GUIManager.instance != null && GUIManager.instance.windowBlockingInput) return; //no keypress when typing in chat or using menus
 
             if (Input.GetKeyDown(KickPatchToggleKey.Value))
             {
