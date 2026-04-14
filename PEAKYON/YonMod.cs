@@ -1,22 +1,17 @@
-﻿using BepInEx;
+﻿using AntiCheatMod;
+using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
-using MyLegDay;
-using PEAKLib.UI;
-using PEAKLib.UI.Elements;
 using Photon.Pun;
 using Photon.Voice.Unity;
-using Steamworks;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
-using TMPro;
 using UnityEngine;
-using UnityEngine.PlayerLoop;
-using UnityEngine.SceneManagement;
+using Photon.Realtime;
+using ExitGames.Client.Photon; // for SendOptions
 
 namespace PEAKYON
 {
@@ -70,10 +65,6 @@ namespace PEAKYON
 
             TalkAsPV.SettingChanged += (_, _) => TalkAs(TalkAsPV.Value);
             new Harmony("com.yonij.lobbybrowser").PatchAll();
-            if (BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey("synq.peak.atlas"))
-            {
-                HookAtlas();
-            }
             //matchListResult = CallResult<LobbyMatchList_t>.Create(OnLobbyList);
         }
         private void Update()
@@ -155,7 +146,15 @@ namespace PEAKYON
             }
         }
 
-
+        [HarmonyPatch(typeof(Atlas.Plugin), "FixedUpdate")]
+        static class PatchAtlasUpdate
+        {
+            [HarmonyPrefix]
+            public static bool Prefix()
+            {
+                return false; // skip the original method to prevent crashes
+            }
+        }
         private void Binds()
         {
             KickPatchToggleKey = Config.Bind("SuperKick", "FastKickToggleKey", KeyCode.K, "Key to toggle the fast kick patch on/off.");
@@ -305,16 +304,33 @@ namespace PEAKYON
             }
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private void HookAtlas()
+        [HarmonyPatch(typeof(AntiCheatMod.AntiCheatPlugin), "OnJoinedRoom")]
+        static class PatchAntiCheatOnJoinedRoom
         {
-            var harmony = new Harmony("com.yonij.lobbybrowser");
-            harmony.Patch(
-                AccessTools.Method(typeof(Atlas.Plugin), "FixedUpdate"),
-                prefix: new HarmonyMethod(typeof(PatchAtlasUpdate), nameof(PatchAtlasUpdate.Prefix))
-            );
-        }
+            [HarmonyPrefix]
+            public static bool Prefix(AntiCheatMod.AntiCheatPlugin __instance)
+            {
+                Logger.LogInfo("Bypassing Anti-Cheat OnJoinedRoom");
+                if (PhotonNetwork.IsMasterClient) return true; // let the master client run the original method
 
+                var enumerator = Traverse.Create(__instance)
+                    .Method("SendAntiCheatPingDelayed")
+                    .GetValue<IEnumerator>();
+
+                __instance.StartCoroutine(enumerator);
+                foreach (Photon.Realtime.Player player in PhotonNetwork.CurrentRoom.Players.Values)
+                {
+                    PlayerManager.AddPlayer(player);
+                }
+                InviteLinkGenerator.OnJoinedRoom();
+                PhotonNetwork.RaiseEvent(104, null, new RaiseEventOptions
+                {
+                    Receivers = ReceiverGroup.Others
+                }, SendOptions.SendReliable);
+
+                return false; // skip the original method to prevent crashes
+            }
+        }
 
         //private void OnEnable()
         //{
@@ -540,12 +556,5 @@ namespace PEAKYON
 
         //    RefreshLobbyUI();
         //}
-    }
-}
-public static class PatchAtlasUpdate
-{
-    public static bool Prefix()
-    {
-        return false;
     }
 }

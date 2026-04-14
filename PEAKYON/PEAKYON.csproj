@@ -31,10 +31,10 @@
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PEAK\PEAK_Data\Managed\Assembly-CSharp.dll</HintPath>
     </Reference>
     <Reference Include="AtlasPeak">
-      <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\PEAK\profiles\Default\BepInEx\plugins\synq-Atlas\AtlasPeak.dll</HintPath>
+      <HintPath>..\..\..\..\Downloads\AtlasPeak.dll</HintPath>
     </Reference>
-    <Reference Include="com.atomic.betterkick">
-      <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\PEAK\profiles\Default\BepInEx\plugins\AtomicStudio-Better_Kick\com.atomic.betterkick.dll</HintPath>
+    <Reference Include="com.dummy.AntiCheatContinuum">
+      <HintPath>..\..\..\..\AppData\Roaming\com.kesomannen.gale\peak\profiles\Default\BepInEx\plugins\Continuum-AntiCheatContinuum\com.dummy.AntiCheatContinuum.dll</HintPath>
     </Reference>
     <Reference Include="com.github.PEAKModding.PEAKLib.Core">
       <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\PEAK\profiles\HackerMan\BepInEx\plugins\PEAKModding-PEAKLib_Core\com.github.PEAKModding.PEAKLib.Core.dll</HintPath>
@@ -53,6 +53,12 @@
     </Reference>
     <Reference Include="PeakTextChat">
       <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\PEAK\profiles\Default\BepInEx\plugins\borealityy-PeakTextChat\PeakTextChat.dll</HintPath>
+    </Reference>
+    <Reference Include="Photon3Unity3D">
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PEAK\PEAK_Data\Managed\Photon3Unity3D.dll</HintPath>
+    </Reference>
+    <Reference Include="PhotonRealtime">
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PEAK\PEAK_Data\Managed\PhotonRealtime.dll</HintPath>
     </Reference>
     <Reference Include="PhotonUnityNetworking">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PEAK\PEAK_Data\Managed\PhotonUnityNetworking.dll</HintPath>
