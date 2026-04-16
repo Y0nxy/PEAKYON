@@ -161,9 +161,9 @@ namespace PEAKYON
             enableSuperKick = Config.Bind("SuperKick", "SuperKick Enable", true, "Toggle the super kick patch on/off.");
             SuperKickForce = Config.Bind("SuperKick", "SuperKick Force", 50f,
                 new ConfigDescription("The force of the SuperKick. (default is 10)", new AcceptableValueRange<float>(-100000000, 100000000)));
-            SuperKickRange = Config.Bind("SuperKick", "SuperKick Range(Forward)", 3f,
+            SuperKickRange = Config.Bind("SuperKick", "SuperKick Range(UP)", 3f,
                 new ConfigDescription("The range of the SuperKick.(default is 3)", new AcceptableValueRange<float>(-1000000, 1000000)));
-            SuperKickDistance = Config.Bind("SuperKick", "SuperKick Distance(UP)", 1f,
+            SuperKickDistance = Config.Bind("SuperKick", "SuperKick Distance(Forward)", 1f,
                 new ConfigDescription("The distance of the SuperKick. (default is 1)", new AcceptableValueRange<float>(-1000000, 1000000)));
             SuperKickRagdollTime = Config.Bind("SuperKick", "SuperKick Ragdoll Time", 1f,
                 new ConfigDescription("How long the ragdoll effect lasts. (default is 1)", new AcceptableValueRange<float>(0f, 1000f)));
