@@ -160,13 +160,13 @@ namespace PEAKYON
             KickPatchToggleKey = Config.Bind("SuperKick", "FastKickToggleKey", KeyCode.K, "Key to toggle the fast kick patch on/off.");
             enableSuperKick = Config.Bind("SuperKick", "SuperKick Enable", true, "Toggle the super kick patch on/off.");
             SuperKickForce = Config.Bind("SuperKick", "SuperKick Force", 50f,
-                new ConfigDescription("The force of the SuperKick. (default is 10)", new AcceptableValueRange<float>(-100f, 1500f)));
-            SuperKickRange = Config.Bind("SuperKick", "SuperKick Range", 3f,
-                new ConfigDescription("The range of the SuperKick. (default is 3)", new AcceptableValueRange<float>(0f, 1000f)));
+                new ConfigDescription("The force of the SuperKick. (default is 10)", new AcceptableValueRange<float>(-100000000, 100000000)));
+            SuperKickRange = Config.Bind("SuperKick", "SuperKick Range(Forward)", 3f,
+                new ConfigDescription("The range of the SuperKick.(default is 3)", new AcceptableValueRange<float>(-1000000, 1000000)));
+            SuperKickDistance = Config.Bind("SuperKick", "SuperKick Distance(UP)", 1f,
+                new ConfigDescription("The distance of the SuperKick. (default is 1)", new AcceptableValueRange<float>(-1000000, 1000000)));
             SuperKickRagdollTime = Config.Bind("SuperKick", "SuperKick Ragdoll Time", 1f,
                 new ConfigDescription("How long the ragdoll effect lasts. (default is 1)", new AcceptableValueRange<float>(0f, 1000f)));
-            SuperKickDistance = Config.Bind("SuperKick", "SuperKick Distance", 1f,
-                new ConfigDescription("The distance of the SuperKick. (default is 1)", new AcceptableValueRange<float>(0f, 1000f)));
             SuperKickAngle = Config.Bind("SuperKick", "SuperKick Angle", 45f,
                 new ConfigDescription("The angle of the SuperKick. (default is 45)", new AcceptableValueRange<float>(0f, 360f)));
             TalkAsKey = Config.Bind("TalkAs", "TalkAsKey", KeyCode.T, "Key to talk as another player (hold while talking).");
