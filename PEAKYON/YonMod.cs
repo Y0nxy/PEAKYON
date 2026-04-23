@@ -1,22 +1,29 @@
-﻿using AntiCheatMod;
-using BepInEx;
+﻿using BepInEx;
+using BepInEx.Bootstrap;
 using BepInEx.Configuration;
 using BepInEx.Logging;
+using ExitGames.Client.Photon; // for SendOptions
 using HarmonyLib;
 using Photon.Pun;
+using Photon.Realtime;
 using Photon.Voice.Unity;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using UnityEngine;
-using Photon.Realtime;
-using ExitGames.Client.Photon; // for SendOptions
 
 namespace PEAKYON
 {
     [BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
-    [BepInDependency("com.github.PEAKModding.PEAKLib.UI")]
+    [BepInDependency("PEAKLobbyBrowser", BepInDependency.DependencyFlags.SoftDependency)]
+    [BepInDependency("synq.peak.atlas", BepInDependency.DependencyFlags.HardDependency)]
+    [BepInDependency("com.dummy.anticheatcontinuum", BepInDependency.DependencyFlags.SoftDependency)]
+    [BepInDependency("evaisa.ThirdPersonToggle", BepInDependency.DependencyFlags.SoftDependency)]
+    [BepInDependency("com.github.LIghtJUNction.TerrainScanner", BepInDependency.DependencyFlags.SoftDependency)]
+
+    //[BepInDependency("com.github.PEAKModding.PEAKLib.UI")]
     public class YonMod : BaseUnityPlugin
     {
         //super kick configs
@@ -41,15 +48,12 @@ namespace PEAKYON
         public static ConfigEntry<float> BugleVolume;
         public static ConfigEntry<float> BuglePitchWobble;
 
+        //BackFlip Success
+        public static ConfigEntry<float> SuccessChance;
+
         internal static new ManualLogSource Logger;
 
         static int MyViewID;
-        //static bool isSearching;
-        //static List<(CSteamID id, string name, int players, int max)> lobbies = new();
-        //static CallResult<LobbyMatchList_t> matchListResult;
-        //static PeakCustomPage serverBrowserPage;
-        //static GameObject serverBrowserPageObj;
-        //static PeakScrollableContent scrollableContent;
 
         private void Awake()
         {
@@ -64,7 +68,9 @@ namespace PEAKYON
             enableSuperKick.SettingChanged += (_, _) => SuperKick();
 
             TalkAsPV.SettingChanged += (_, _) => TalkAs(TalkAsPV.Value);
-            new Harmony("com.yonij.lobbybrowser").PatchAll();
+            //new Harmony(MyPluginInfo.PLUGIN_GUID).PatchAll();
+            var harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
+            PatchAll(harmony);
             //matchListResult = CallResult<LobbyMatchList_t>.Create(OnLobbyList);
         }
         private void Update()
@@ -89,10 +95,10 @@ namespace PEAKYON
             //}
         }
 
-        [HarmonyPatch(typeof(PEAKLobbyBrowser.PEAKLobbyBrowser), "Start")]
+        //[HarmonyPatch("PEAKLobbyBrowser.PEAKLobbyBrowser", "Start")]
         public static class PatchPEAKLobbyBrowserStart
         {
-            static bool Prefix() { 
+            public static bool Prefix() { 
                 Logger.LogInfo("Anti-Cheat Bypassed");
                 return false; // returning false skips the original
             }
@@ -146,7 +152,7 @@ namespace PEAKYON
             }
         }
 
-        [HarmonyPatch(typeof(Atlas.Plugin), "FixedUpdate")]
+        //[HarmonyPatch("Atlas.Plugin", "FixedUpdate")]
         static class PatchAtlasUpdate
         {
             [HarmonyPrefix]
@@ -188,7 +194,9 @@ namespace PEAKYON
 
             BuglePatchEnabled = Config.Bind("Bugle", "Bugle Patch Enabled", true, "Toggle the bugle patch on/off.");
             BuglePatchToggleKey = Config.Bind("Bugle", "Bugle Patch Toggle Key", KeyCode.Backslash, "Key to toggle the bugle patch on/off.");
-            
+
+            SuccessChance = Config.Bind("Emotes", "Backflip Success", 50f,
+                new ConfigDescription("Probability of backflip succeeding (0 - 100)", new AcceptableValueRange<float>(0f, 100f)));
         }
 
         //kick cooldown patch
@@ -210,7 +218,7 @@ namespace PEAKYON
 
         public static void Notification(string message, string color = "FFFFFF", bool sound = false)
         {
-            PlayerConnectionLog connectionLog = Object.FindAnyObjectByType<PlayerConnectionLog>();
+            PlayerConnectionLog connectionLog = UnityEngine.Object.FindAnyObjectByType<PlayerConnectionLog>();
             if (connectionLog == null)
             {
                 return;
@@ -304,11 +312,11 @@ namespace PEAKYON
             }
         }
 
-        [HarmonyPatch(typeof(AntiCheatMod.AntiCheatPlugin), "OnJoinedRoom")]
+        //[HarmonyPatch("AntiCheatMod.AntiCheatPlugin", "OnJoinedRoom")]
         static class PatchAntiCheatOnJoinedRoom
         {
             [HarmonyPrefix]
-            public static bool Prefix(AntiCheatMod.AntiCheatPlugin __instance)
+            public static bool Prefix(object __instance)
             {
                 Logger.LogInfo("Bypassing Anti-Cheat OnJoinedRoom");
                 if (PhotonNetwork.IsMasterClient) return true; // let the master client run the original method
@@ -317,12 +325,17 @@ namespace PEAKYON
                     .Method("SendAntiCheatPingDelayed")
                     .GetValue<IEnumerator>();
 
-                __instance.StartCoroutine(enumerator);
+                ((MonoBehaviour)__instance).StartCoroutine(enumerator);
+                var playerManagerType = AccessTools.TypeByName("AntiCheatMod.PlayerManager");
+                var addPlayerMethod = AccessTools.Method(playerManagerType, "AddPlayer");
                 foreach (Photon.Realtime.Player player in PhotonNetwork.CurrentRoom.Players.Values)
                 {
-                    PlayerManager.AddPlayer(player);
+                    addPlayerMethod.Invoke(null, new object[] { player });
                 }
-                InviteLinkGenerator.OnJoinedRoom();
+
+                var inviteLinkType = AccessTools.TypeByName("AntiCheatMod.InviteLinkGenerator");
+                var onJoinedRoomMethod = AccessTools.Method(inviteLinkType, "OnJoinedRoom");
+                onJoinedRoomMethod.Invoke(null, null);
                 PhotonNetwork.RaiseEvent(104, null, new RaiseEventOptions
                 {
                     Receivers = ReceiverGroup.Others
@@ -331,230 +344,107 @@ namespace PEAKYON
                 return false; // skip the original method to prevent crashes
             }
         }
+        
+        static class ChatFix
+        {
+            [HarmonyPrefix]
+            public static bool Prefix(object __instance)
+            {
+                if (GUIManager.instance != null && GUIManager.instance.windowBlockingInput) Input.ResetInputAxes();
+                return true; // let the rest of the original method run normally
+            }
+        }
 
-        //private void OnEnable()
-        //{
-        //    SceneManager.sceneLoaded += OnSceneLoaded;
-        //}
+        [HarmonyPatch(typeof(CharacterAnimations), "PlayEmote")]
+        static class BackFlipPatch
+        {
+            [HarmonyTranspiler]
+            static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+            {
+                var randomValue = AccessTools.Property(typeof(UnityEngine.Random), nameof(UnityEngine.Random.value)).GetGetMethod();
+                var codes = new List<CodeInstruction>(instructions);
 
-        //private void OnDisable()
-        //{
-        //    SceneManager.sceneLoaded -= OnSceneLoaded;
-        //}
+                for (int i = 0; i < codes.Count; i++)
+                {
+                    if (codes[i].Calls(randomValue))
+                    {
+                        // remove: Random.value, ldc.r4 0.5, cgt
+                        // replace with just our method call which returns bool directly
+                        codes[i] = new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(BackFlipPatch), nameof(GetSucceeded)));
+                        codes.RemoveAt(i + 1); // remove ldc.r4 0.5
+                        codes.RemoveAt(i + 1); // remove cgt
+                        break;
+                    }
+                }
 
-        //private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-        //{
-        //    Logger.LogInfo($"Scene loaded: {scene.name}");
-        //    if (scene.name == "Title")
-        //        StartCoroutine(CreateButtonAndMenu());
-        //}
+                return codes;
+            }
 
-        //private IEnumerator CreateButtonAndMenu()
-        //{
-        //    yield return new WaitForSeconds(5f);
+            static bool GetSucceeded()
+            {
+                bool succeeded = UnityEngine.Random.value * 100f > SuccessChance.Value;
+                //Notification(succeeded ? "Backflip Failed!" : "Backflip Succeeded!", succeeded ? "FF0000" : "00FF00", true);
+                return succeeded;
+            }
+        }
 
-        //    GameObject ogButton = null;
-        //    while (ogButton == null)
-        //    {
-        //        ogButton = GameObject.Find("MainMenu/Canvas/MainPage/Menu/Buttons/Button_PlaySolo");
-        //        yield return new WaitForSeconds(1f);
-        //    }
-        //    Logger.LogInfo("Found original button, creating lobby browser button...");
+        private void PatchAll(Harmony harmony)
+        {
+            var patchTypes = new List<Type>
+            {
+                typeof(Patch_KickCast_NoStamina),
+                typeof(CharacterGrabbing_Update_Patch),
+                typeof(CurrentItemPatch),
+                typeof(BackFlipPatch),
 
-        //    // --- Cloned button ---
-        //    GameObject buttonObj = Instantiate(ogButton, GameObject.Find("MainMenu/Canvas/MainPage/").transform);
-        //    buttonObj.name = "LobbyBrowserButton";
-        //    buttonObj.GetComponent<RectTransform>().localScale = new Vector3(-1.25f, 1.25f, 1);
-        //    buttonObj.GetComponent<RectTransform>().position = new Vector2(1710, 625);
+                // add/remove patches here easily
+            };
+            foreach (var type in patchTypes)
+            {
+                harmony.CreateClassProcessor(type).Patch();
+            }
 
-        //    RectTransform textRectTransform = buttonObj.transform.Find("Hinge/Text").GetComponent<RectTransform>();
-        //    Vector3 textScale = textRectTransform.localScale;
-        //    textScale.x *= -1;
-        //    textRectTransform.localScale = textScale;
+            // Optional patches
+            StartCoroutine(PatchOptionalLate(harmony));
 
-        //    TextMeshProUGUI textComponent = textRectTransform.GetComponent<TextMeshProUGUI>();
-        //    textComponent.text = "Lobby Browser";
-        //    textComponent.alignment = TextAlignmentOptions.Capline;
-        //    textComponent.fontSize = 30;
+        }
+        private IEnumerator PatchOptionalLate(Harmony harmony)
+        {
+            if (Chainloader.PluginInfos.ContainsKey("PEAKLobbyBrowser"))
+                PatchOptional(harmony, "PEAKLobbyBrowser.PEAKLobbyBrowser", "Start",
+                    typeof(PatchPEAKLobbyBrowserStart), nameof(PatchPEAKLobbyBrowserStart.Prefix));
 
-        //    MakeMenuUI();
+            yield return new WaitForSeconds(1f);
+            if (Chainloader.PluginInfos.ContainsKey("synq.peak.atlas"))
+            {
+                Logger.LogInfo("Atlas plugin detected, applied Atlas FixedUpdate patch");
+                PatchOptional(harmony, "Atlas.Plugin", "FixedUpdate",
+                    typeof(PatchAtlasUpdate), nameof(PatchAtlasUpdate.Prefix));
+            }
+            else Logger.LogInfo("Atlas plugin not detected, skipping Atlas FixedUpdate patch");
 
-        //    // --- Wire up button click ---
-        //    UnityEngine.UI.Button btn = buttonObj.GetComponent<UnityEngine.UI.Button>();
-        //    btn.onClick = new UnityEngine.UI.Button.ButtonClickedEvent();
-        //    btn.onClick.AddListener(() =>
-        //    {
-        //        Logger.LogInfo("Lobby Browser button clicked!");
-        //        serverBrowserPageObj.SetActive(true);
-        //        Refresh();
-        //    });
+            if (Chainloader.PluginInfos.ContainsKey("com.dummy.anticheatcontinuum"))
+                PatchOptional(harmony, "AntiCheatMod.AntiCheatPlugin", "OnJoinedRoom",
+                    typeof(PatchAntiCheatOnJoinedRoom), nameof(PatchAntiCheatOnJoinedRoom.Prefix));
 
-        //    Logger.LogInfo("Lobby browser button and menu created!");
-        //}
+            if (Chainloader.PluginInfos.ContainsKey("evaisa.ThirdPersonToggle"))
+                PatchOptional(harmony, "Evaisa.ThirdPersonToggle.ThirdPersonToggle", "MainCameraMovement_LateUpdate",
+                    typeof(ChatFix), nameof(ChatFix.Prefix));
+            if (Chainloader.PluginInfos.ContainsKey("com.github.LIghtJUNction.TerrainScanner"))
+                PatchOptional(harmony, "TerrainScanner.DS.ActiveScan", "Update",
+                    typeof(ChatFix), nameof(ChatFix.Prefix));
 
-        //private void MakeMenuUI()
-        //{
-        //    serverBrowserPage = MenuAPI.CreatePageWithBackground("ServerBrowserPage");
-        //    serverBrowserPageObj = ((MonoBehaviour)serverBrowserPage).gameObject;
+        }
+        private void PatchOptional(Harmony harmony, string typeName, string methodName, Type patchClass, string prefixName)
+        {
+            var type = AccessTools.TypeByName(typeName);
+            if (type == null) { Logger.LogWarning($"Optional type not found: {typeName}"); return; }
+            var method = AccessTools.Method(type, methodName);
+            if (method == null) { Logger.LogWarning($"Optional method not found: {typeName}.{methodName}"); return; }
 
-        //    Transform bg = serverBrowserPageObj.transform.Find("Background");
-        //    if (bg == null)
-        //    {
-        //        Logger.LogInfo("Background not found!");
-        //        return;
-        //    }
-
-        //    // Create a 600x500 panel centered on the background
-        //    GameObject panel = new GameObject("Panel");
-        //    panel.transform.SetParent(bg, false);
-        //    UnityEngine.UI.Image panelImage = panel.AddComponent<UnityEngine.UI.Image>();
-        //    panelImage.color = new Color(0.76f, 0.60f, 0.38f, 0.95f);
-        //    RectTransform panelRect = panel.GetComponent<RectTransform>();
-        //    panelRect.anchorMin = new Vector2(0.5f, 0.5f);
-        //    panelRect.anchorMax = new Vector2(0.5f, 0.5f);
-        //    panelRect.pivot = new Vector2(0.5f, 0.5f);
-        //    panelRect.sizeDelta = new Vector2(600f, 500f);
-        //    panelRect.anchoredPosition = Vector2.zero;
-
-        //    Transform p = panel.transform;
-
-        //    // Title
-        //    var title = MenuAPI.CreateText("Server Browser").ParentTo(p).SetFontSize(28);
-        //    RectTransform titleRect = title.gameObject.GetComponent<RectTransform>();
-        //    titleRect.anchorMin = new Vector2(0, 1);
-        //    titleRect.anchorMax = new Vector2(1, 1);
-        //    titleRect.pivot = new Vector2(0.5f, 1);
-        //    titleRect.anchoredPosition = new Vector2(0, -15);
-        //    titleRect.sizeDelta = new Vector2(0, 40);
-        //    titleRect.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Center;
-
-        //    // Refresh button
-        //    var refreshBtn = MenuAPI.CreateMenuButton("Refresh").ParentTo(p)
-        //        .OnClick(() => { if (!isSearching) Refresh(); });
-        //    RectTransform refreshRect = refreshBtn.gameObject.GetComponent<RectTransform>();
-        //    refreshRect.anchorMin = new Vector2(0, 1);
-        //    refreshRect.anchorMax = new Vector2(0, 1);
-        //    refreshRect.pivot = new Vector2(0, 1);
-        //    refreshRect.anchoredPosition = new Vector2(15, -60);
-        //    refreshRect.sizeDelta = new Vector2(120, 40);
-
-        //    // Close button
-        //    var closeBtn = MenuAPI.CreateMenuButton("Close").ParentTo(p)
-        //        .OnClick(() => serverBrowserPageObj.SetActive(false));
-        //    RectTransform closeRect = closeBtn.gameObject.GetComponent<RectTransform>();
-        //    closeRect.anchorMin = new Vector2(1, 1);
-        //    closeRect.anchorMax = new Vector2(1, 1);
-        //    closeRect.pivot = new Vector2(1, 1);
-        //    closeRect.anchoredPosition = new Vector2(-15, -60);
-        //    closeRect.sizeDelta = new Vector2(120, 40);
-
-        //    // Scrollable lobby list
-        //    var scroll = MenuAPI.CreateScrollableContent("LobbyList").ParentTo(p);
-        //    scrollableContent = scroll;
-        //    RectTransform scrollRect = scroll.gameObject.GetComponent<RectTransform>();
-        //    scrollRect.anchorMin = new Vector2(0, 0);
-        //    scrollRect.anchorMax = new Vector2(1, 1);
-        //    scrollRect.offsetMin = new Vector2(10, 10);
-        //    scrollRect.offsetMax = new Vector2(-10, -110);
-
-        //    UnityEngine.UI.VerticalLayoutGroup vlg = scroll.Content.gameObject.GetComponent<UnityEngine.UI.VerticalLayoutGroup>();
-        //    if (vlg != null)
-        //    {
-        //        vlg.spacing = 5;
-        //        vlg.childForceExpandWidth = true;
-        //        vlg.childForceExpandHeight = false;
-        //        vlg.childControlWidth = true;
-        //        vlg.childControlHeight = true;
-        //        vlg.padding = new RectOffset(5, 5, 5, 5);
-        //    }
-
-        //    UnityEngine.UI.ContentSizeFitter csf = scroll.Content.gameObject.GetComponent<UnityEngine.UI.ContentSizeFitter>()
-        //        ?? scroll.Content.gameObject.AddComponent<UnityEngine.UI.ContentSizeFitter>();
-        //    csf.verticalFit = UnityEngine.UI.ContentSizeFitter.FitMode.PreferredSize;
-
-        //    serverBrowserPageObj.SetActive(false);
-        //}
-        //static void RefreshLobbyUI()
-        //{
-        //    if (scrollableContent == null) return;
-
-        //    foreach (Transform child in scrollableContent.Content)
-        //        Destroy(child.gameObject);
-
-        //    if (lobbies.Count == 0)
-        //    {
-        //        MenuAPI.CreateText(isSearching ? "Searching..." : "No servers found.")
-        //            .ParentTo(scrollableContent.Content)
-        //            .SetFontSize(22)
-        //            .AlignToParent(UIAlignment.TopCenter);
-        //        return;
-        //    }
-
-        //    foreach (var lobby in lobbies)
-        //    {
-        //        GameObject row = new GameObject("LobbyRow");
-        //        row.transform.SetParent(scrollableContent.Content, false);
-
-        //        UnityEngine.UI.HorizontalLayoutGroup hlg = row.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
-        //        hlg.spacing = 10;
-        //        hlg.childForceExpandHeight = false;
-        //        hlg.childForceExpandWidth = false;
-        //        hlg.childControlWidth = true;
-        //        hlg.childControlHeight = true;
-        //        hlg.padding = new RectOffset(10, 10, 5, 5);
-
-        //        UnityEngine.UI.LayoutElement rowLayout = row.AddComponent<UnityEngine.UI.LayoutElement>();
-        //        rowLayout.preferredHeight = 50;
-        //        rowLayout.flexibleWidth = 1;
-
-        //        // Server name
-        //        var nameText = MenuAPI.CreateText(lobby.name).ParentTo(row.transform).SetFontSize(22);
-        //        nameText.gameObject.AddComponent<UnityEngine.UI.LayoutElement>().flexibleWidth = 1;
-
-        //        // Player count
-        //        var countText = MenuAPI.CreateText($"{lobby.players}/{lobby.max}").ParentTo(row.transform).SetFontSize(22);
-        //        countText.gameObject.AddComponent<UnityEngine.UI.LayoutElement>().preferredWidth = 70;
-
-        //        // Join button
-        //        var lobbyId = lobby.id;
-        //        var joinBtn = MenuAPI.CreateMenuButton("Join").ParentTo(row.transform)
-        //            .SetWidth(90)
-        //            .OnClick(() =>
-        //            {
-        //                SteamMatchmaking.JoinLobby(lobbyId);
-        //                serverBrowserPageObj.SetActive(false);
-        //            });
-        //        var joinLayout = joinBtn.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
-        //        joinLayout.preferredWidth = 90;
-        //        joinLayout.minWidth = 90;
-        //        joinLayout.preferredHeight = 40;
-        //        joinLayout.minHeight = 40;
-        //        joinLayout.flexibleWidth = 0;
-        //    }
-        //}
-        //static void Refresh()
-        //{
-        //    lobbies.Clear();
-        //    isSearching = true;
-        //    RefreshLobbyUI();
-        //    SteamMatchmaking.AddRequestLobbyListDistanceFilter(ELobbyDistanceFilter.k_ELobbyDistanceFilterWorldwide);
-        //    matchListResult.Set(SteamMatchmaking.RequestLobbyList());
-        //}
-
-        //static void OnLobbyList(LobbyMatchList_t result, bool failure)
-        //{
-        //    isSearching = false;
-        //    if (failure) return;
-
-        //    for (int i = 0; i < result.m_nLobbiesMatching; i++)
-        //    {
-        //        var id = SteamMatchmaking.GetLobbyByIndex(i);
-        //        string name = SteamMatchmaking.GetLobbyData(id, "name");
-        //        if (string.IsNullOrEmpty(name)) name = $"Server {i + 1}";
-        //        lobbies.Add((id, name, SteamMatchmaking.GetNumLobbyMembers(id), SteamMatchmaking.GetLobbyMemberLimit(id)));
-        //    }
-
-        //    RefreshLobbyUI();
-        //}
+            var prefix = new HarmonyMethod(patchClass, prefixName);
+            harmony.Patch(method, prefix: prefix);
+            Logger.LogInfo($"Patched optional: {typeName}.{methodName}");
+        }
     }
 }

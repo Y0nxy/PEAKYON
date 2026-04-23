@@ -30,29 +30,8 @@
     <Reference Include="Assembly-CSharp">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PEAK\PEAK_Data\Managed\Assembly-CSharp.dll</HintPath>
     </Reference>
-    <Reference Include="AtlasPeak">
-      <HintPath>..\..\..\..\Downloads\AtlasPeak.dll</HintPath>
-    </Reference>
-    <Reference Include="com.dummy.AntiCheatContinuum">
-      <HintPath>..\..\..\..\AppData\Roaming\com.kesomannen.gale\peak\profiles\Default\BepInEx\plugins\Continuum-AntiCheatContinuum\com.dummy.AntiCheatContinuum.dll</HintPath>
-    </Reference>
-    <Reference Include="com.github.PEAKModding.PEAKLib.Core">
-      <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\PEAK\profiles\HackerMan\BepInEx\plugins\PEAKModding-PEAKLib_Core\com.github.PEAKModding.PEAKLib.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="com.github.PEAKModding.PEAKLib.UI">
-      <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\PEAK\profiles\HackerMan\BepInEx\plugins\PEAKModding-PEAKLib_UI\com.github.PEAKModding.PEAKLib.UI.dll</HintPath>
-    </Reference>
     <Reference Include="com.rlabrecque.steamworks.net">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PEAK\PEAK_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
-    </Reference>
-    <Reference Include="my.pahsiv.MyLegDay">
-      <HintPath>..\..\..\..\Downloads\my.pahsiv.MyLegDay.dll</HintPath>
-    </Reference>
-    <Reference Include="PEAKLobbyBrowser">
-      <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\PEAK\profiles\Default\BepInEx\plugins\Isotope-PEAKLobbyBrowser\PEAKLobbyBrowser.dll</HintPath>
-    </Reference>
-    <Reference Include="PeakTextChat">
-      <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\PEAK\profiles\Default\BepInEx\plugins\borealityy-PeakTextChat\PeakTextChat.dll</HintPath>
     </Reference>
     <Reference Include="Photon3Unity3D">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PEAK\PEAK_Data\Managed\Photon3Unity3D.dll</HintPath>
