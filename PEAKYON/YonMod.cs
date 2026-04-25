@@ -97,15 +97,24 @@ namespace PEAKYON
 
         private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
         {
+            //Logger.LogInfo($"Scene loaded: {scene.name}");
             if (scene.name == "Airport")
             {
-                var go = GameObject.Find("Map/BL_Airport/BakeData/LightBlockers2/shadowblock (9)");
-                if (go != null)
-                {
-                    var col = go.GetComponent<BoxCollider>();
-                    if (col != null) col.enabled = false;
-                }
+                //Logger.LogInfo("Airport scene detected");
+                if (Chainloader.PluginInfos.ContainsKey("synq.peak.atlas"))
+                    StartCoroutine(DisableAirportCollider());
             }
+        }
+        private IEnumerator DisableAirportCollider()
+        {
+            var go = GameObject.Find("Map/BL_Airport/BakeData/LightBlockers2/shadowblock (9)");
+            while (go == null || go.GetComponent<BoxCollider>() == null)
+            {
+                Logger.LogInfo("Waiting for Atlas airport collider...");
+                yield return new WaitForSeconds(.25f); // wait until the object exists
+            }
+            UnityEngine.Object.Destroy(go.GetComponent<BoxCollider>());
+            Logger.LogInfo("Disabled Atlas airport collider");
         }
         //no Stamina patch for kicks
         [HarmonyPatch(typeof(CharacterGrabbing), nameof(CharacterGrabbing.KickCast))]
