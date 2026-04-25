@@ -59,7 +59,7 @@ namespace PEAKYON
         {
             Logger = base.Logger;
             Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
-
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
             Binds();
             HearYourselfToggle.Value = false;
             HearYourselfToggle.SettingChanged += (_, _) => HearYourself();
@@ -95,15 +95,18 @@ namespace PEAKYON
             //}
         }
 
-        //[HarmonyPatch("PEAKLobbyBrowser.PEAKLobbyBrowser", "Start")]
-        public static class PatchPEAKLobbyBrowserStart
+        private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
         {
-            public static bool Prefix() { 
-                Logger.LogInfo("Anti-Cheat Bypassed");
-                return false; // returning false skips the original
+            if (scene.name == "Airport")
+            {
+                var go = GameObject.Find("Map/BL_Airport/BakeData/LightBlockers2/shadowblock (9)");
+                if (go != null)
+                {
+                    var col = go.GetComponent<BoxCollider>();
+                    if (col != null) col.enabled = false;
+                }
             }
         }
-
         //no Stamina patch for kicks
         [HarmonyPatch(typeof(CharacterGrabbing), nameof(CharacterGrabbing.KickCast))]
         static class Patch_KickCast_NoStamina
@@ -152,10 +155,10 @@ namespace PEAKYON
             }
         }
 
+        //[HarmonyPatch("PEAKLobbyBrowser.PEAKLobbyBrowser", "Start")]
         //[HarmonyPatch("Atlas.Plugin", "FixedUpdate")]
-        static class PatchAtlasUpdate
+        static class BlockMethod
         {
-            [HarmonyPrefix]
             public static bool Prefix()
             {
                 return false; // skip the original method to prevent crashes
@@ -318,8 +321,8 @@ namespace PEAKYON
             [HarmonyPrefix]
             public static bool Prefix(object __instance)
             {
-                Logger.LogInfo("Bypassing Anti-Cheat OnJoinedRoom");
                 if (PhotonNetwork.IsMasterClient) return true; // let the master client run the original method
+                Logger.LogInfo("Bypassing Anti-Cheat OnJoinedRoom");
 
                 var enumerator = Traverse.Create(__instance)
                     .Method("SendAntiCheatPingDelayed")
@@ -341,16 +344,60 @@ namespace PEAKYON
                     Receivers = ReceiverGroup.Others
                 }, SendOptions.SendReliable);
 
+                var antiCheatType = AccessTools.TypeByName("AntiCheatMod.AntiCheatPlugin");
+                var sendModList = AccessTools.Method(antiCheatType, "SendModListToMaster");
+                sendModList.Invoke(__instance, null);
+
+                var shareModList = Traverse.Create(__instance)
+                    .Field("ShareModList")
+                    .GetValue<BepInEx.Configuration.ConfigEntry<bool>>();
+
+                if (shareModList != null && !shareModList.Value)
+                {
+                    var trackOptOut = Traverse.Create(__instance)
+                        .Method("TrackModListOptOut")
+                        .GetValue<IEnumerator>();
+
+                    ((MonoBehaviour)__instance).StartCoroutine(trackOptOut);
+                }
                 return false; // skip the original method to prevent crashes
             }
         }
-        
+        static class CustomModListPatch
+        {
+            [HarmonyPostfix]
+            public static void PostFix(ref string[] __result)
+            {
+                Logger.LogInfo("Custom Mod List Patch Applied");
+                __result = new string[]{ "What are <color=red>YOU</color> looking at?" } ;
+            }
+            //anti cheat version
+            [HarmonyPrefix]
+            public static bool SendAntiCheatPing(object __instance)
+            {
+                if (!PhotonNetwork.IsConnected || !PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null)
+                    return true; // let original handle the warning
+
+                object[] pingData = new object[]
+                {
+                    PhotonNetwork.LocalPlayer.NickName,
+                    PhotonNetwork.LocalPlayer.UserId,
+                    " ∞" // spoofed version
+                };
+                Logger.LogInfo(string.Format("[AntiCheat] About to send ping event with code {0}", 69));
+                RaiseEventOptions opts = new RaiseEventOptions { Receivers = 0 };
+                bool success = PhotonNetwork.RaiseEvent(69, pingData, opts, SendOptions.SendReliable);
+                Logger.LogInfo(string.Format("[AntiCheat] Sent anticheat detection ping to other players - Success: {0}", success));
+
+                return false; // skip original
+            }
+        }
         static class ChatFix
         {
             [HarmonyPrefix]
             public static bool Prefix(object __instance)
             {
-                if (GUIManager.instance != null && GUIManager.instance.windowBlockingInput) Input.ResetInputAxes();
+                if (GUIManager.instance != null && GUIManager.instance.windowBlockingInput) return false;
                 return true; // let the rest of the original method run normally
             }
         }
@@ -411,39 +458,51 @@ namespace PEAKYON
         private IEnumerator PatchOptionalLate(Harmony harmony)
         {
             if (Chainloader.PluginInfos.ContainsKey("PEAKLobbyBrowser"))
+            {
+                Logger.LogInfo("Anti-Cheat Bypassed");
                 PatchOptional(harmony, "PEAKLobbyBrowser.PEAKLobbyBrowser", "Start",
-                    typeof(PatchPEAKLobbyBrowserStart), nameof(PatchPEAKLobbyBrowserStart.Prefix));
+                    typeof(BlockMethod), nameof(BlockMethod.Prefix));
+            }
 
             yield return new WaitForSeconds(1f);
             if (Chainloader.PluginInfos.ContainsKey("synq.peak.atlas"))
             {
                 Logger.LogInfo("Atlas plugin detected, applied Atlas FixedUpdate patch");
                 PatchOptional(harmony, "Atlas.Plugin", "FixedUpdate",
-                    typeof(PatchAtlasUpdate), nameof(PatchAtlasUpdate.Prefix));
+                    typeof(BlockMethod), nameof(BlockMethod.Prefix));
             }
             else Logger.LogInfo("Atlas plugin not detected, skipping Atlas FixedUpdate patch");
 
             if (Chainloader.PluginInfos.ContainsKey("com.dummy.anticheatcontinuum"))
+            {
                 PatchOptional(harmony, "AntiCheatMod.AntiCheatPlugin", "OnJoinedRoom",
                     typeof(PatchAntiCheatOnJoinedRoom), nameof(PatchAntiCheatOnJoinedRoom.Prefix));
-
-            if (Chainloader.PluginInfos.ContainsKey("evaisa.ThirdPersonToggle"))
-                PatchOptional(harmony, "Evaisa.ThirdPersonToggle.ThirdPersonToggle", "MainCameraMovement_LateUpdate",
-                    typeof(ChatFix), nameof(ChatFix.Prefix));
+                PatchOptional(harmony, "AntiCheatMod.AntiCheatPlugin", "GetInstalledMods",
+                    typeof(CustomModListPatch), nameof(CustomModListPatch.PostFix), false);
+                PatchOptional(harmony, "AntiCheatMod.AntiCheatPlugin", "SendAntiCheatPing",
+                    typeof(CustomModListPatch), nameof(CustomModListPatch.SendAntiCheatPing));
+            }
             if (Chainloader.PluginInfos.ContainsKey("com.github.LIghtJUNction.TerrainScanner"))
                 PatchOptional(harmony, "TerrainScanner.DS.ActiveScan", "Update",
                     typeof(ChatFix), nameof(ChatFix.Prefix));
 
         }
-        private void PatchOptional(Harmony harmony, string typeName, string methodName, Type patchClass, string prefixName)
+        private void PatchOptional(Harmony harmony, string typeName, string methodName, Type patchClass, string prefixName, bool isPrefix = true)
         {
             var type = AccessTools.TypeByName(typeName);
             if (type == null) { Logger.LogWarning($"Optional type not found: {typeName}"); return; }
             var method = AccessTools.Method(type, methodName);
             if (method == null) { Logger.LogWarning($"Optional method not found: {typeName}.{methodName}"); return; }
 
-            var prefix = new HarmonyMethod(patchClass, prefixName);
-            harmony.Patch(method, prefix: prefix);
+            var harmonyMethod = new HarmonyMethod(patchClass, prefixName);
+            if (isPrefix)
+            {
+                harmony.Patch(method, prefix: harmonyMethod);
+            }
+            else
+            {
+                harmony.Patch(method, postfix: harmonyMethod);
+            }
             Logger.LogInfo($"Patched optional: {typeName}.{methodName}");
         }
     }
