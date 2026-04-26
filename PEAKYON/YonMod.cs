@@ -479,6 +479,7 @@ namespace PEAKYON
             // Token: 0x06000016 RID: 22 RVA: 0x00002EA4 File Offset: 0x000010A4
             private static void Postfix(Looker __instance, ref GameObject ___guy)
             {
+                if (!LookerEnable.Value) return;
                 bool flag = ___guy != null;
                 if (flag)
                 {
@@ -493,6 +494,7 @@ namespace PEAKYON
             // Token: 0x06000017 RID: 23 RVA: 0x00002EEC File Offset: 0x000010EC
             private static bool Prefix()
             {
+                if (!LookerEnable.Value) return true;
                 Debug.Log("[LuridLoomingLookers] Skipped ToggleLookers - keeping all Lookers enabled");
                 return false;
             }
