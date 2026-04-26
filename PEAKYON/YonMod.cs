@@ -18,12 +18,11 @@ namespace PEAKYON
 {
     [BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
     [BepInDependency("PEAKLobbyBrowser", BepInDependency.DependencyFlags.SoftDependency)]
-    [BepInDependency("synq.peak.atlas", BepInDependency.DependencyFlags.HardDependency)]
+    [BepInDependency("synq.peak.atlas", BepInDependency.DependencyFlags.SoftDependency)]
     [BepInDependency("com.dummy.anticheatcontinuum", BepInDependency.DependencyFlags.SoftDependency)]
     [BepInDependency("evaisa.ThirdPersonToggle", BepInDependency.DependencyFlags.SoftDependency)]
     [BepInDependency("com.github.LIghtJUNction.TerrainScanner", BepInDependency.DependencyFlags.SoftDependency)]
 
-    //[BepInDependency("com.github.PEAKModding.PEAKLib.UI")]
     public class YonMod : BaseUnityPlugin
     {
         //super kick configs
@@ -50,6 +49,9 @@ namespace PEAKYON
 
         //BackFlip Success
         public static ConfigEntry<float> SuccessChance;
+        //LookerEnable Config
+        public static ConfigEntry<KeyCode> LookerEnableKey;
+        public static ConfigEntry<bool> LookerEnable;
 
         internal static new ManualLogSource Logger;
 
@@ -66,7 +68,8 @@ namespace PEAKYON
             BuglePatchEnabled.Value = false;
             BuglePatchEnabled.SettingChanged += (_, _) => Notification("Bugle Patch is " + (BuglePatchEnabled.Value ? "ON" : "OFF"));
             enableSuperKick.SettingChanged += (_, _) => SuperKick();
-
+            LookerEnable.Value = false;
+            LookerEnable.SettingChanged += (_, _) => Notification("Looker Patches are " + (LookerEnable.Value ? "ON" : "OFF"));
             TalkAsPV.SettingChanged += (_, _) => TalkAs(TalkAsPV.Value);
             //new Harmony(MyPluginInfo.PLUGIN_GUID).PatchAll();
             var harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
@@ -84,6 +87,10 @@ namespace PEAKYON
             if (Input.GetKeyDown(BuglePatchToggleKey.Value))
             {
                 BuglePatchEnabled.Value = !BuglePatchEnabled.Value;
+            }
+            if (Input.GetKeyDown(LookerEnableKey.Value))
+            {
+                LookerEnable.Value = !LookerEnable.Value;
             }
             //if (Input.GetKey(TalkAsKey.Value) && Character.localCharacter != null)
             //{
@@ -209,6 +216,8 @@ namespace PEAKYON
 
             SuccessChance = Config.Bind("Emotes", "Backflip Success", 50f,
                 new ConfigDescription("Probability of backflip succeeding (0 - 100)", new AcceptableValueRange<float>(0f, 100f)));
+            LookerEnableKey = Config.Bind("Lookers", "Looker Enable Key", KeyCode.L, "Key to not disable all lookers");
+            LookerEnable = Config.Bind("Lookers", "Looker Enable", true, "Toggle the lookers on/off.");
         }
 
         //kick cooldown patch
@@ -444,6 +453,51 @@ namespace PEAKYON
             }
         }
 
+        //[HarmonyPatch(typeof(PropSpawner), "Spawn")]
+        //public class PropSpawnerPatch
+        //{
+        //    public static List<PropSpawner.SpawnData> CapturedData = new();
+
+        //    // Runs BEFORE Spawn()
+        //    static void Prefix(PropSpawner.SpawnData spawnData)
+        //    {
+        //        CapturedData.Add(spawnData);
+
+        //        Debug.Log($"[SpawnData #{CapturedData.Count}]\n" +
+        //                  $"  pos:          {spawnData.pos}\n" +
+        //                  $"  normal:       {spawnData.normal}\n" +
+        //                  $"  rayDir:       {spawnData.rayDir}\n" +
+        //                  $"  placement:    {spawnData.placement}\n" +
+        //                  $"  spawnCount:   {spawnData.spawnCount}\n" +
+        //                  $"  spawner:      {spawnData.spawnerTransform?.name}");
+        //    }
+        //}
+
+        [HarmonyPatch(typeof(Looker), "Start")]
+        public static class Looker_Start_Patch
+        {
+            // Token: 0x06000016 RID: 22 RVA: 0x00002EA4 File Offset: 0x000010A4
+            private static void Postfix(Looker __instance, ref GameObject ___guy)
+            {
+                bool flag = ___guy != null;
+                if (flag)
+                {
+                    ___guy.SetActive(true);
+                    Debug.Log("[LuridLoomingLookers] Forced " + __instance.gameObject.name + " guy active");
+                }
+            }
+        }
+        [HarmonyPatch(typeof(Looker), "ToggleLookers")]
+        public static class Looker_ToggleLookers_Patch
+        {
+            // Token: 0x06000017 RID: 23 RVA: 0x00002EEC File Offset: 0x000010EC
+            private static bool Prefix()
+            {
+                Debug.Log("[LuridLoomingLookers] Skipped ToggleLookers - keeping all Lookers enabled");
+                return false;
+            }
+        }
+
         private void PatchAll(Harmony harmony)
         {
             var patchTypes = new List<Type>
@@ -452,6 +506,8 @@ namespace PEAKYON
                 typeof(CharacterGrabbing_Update_Patch),
                 typeof(CurrentItemPatch),
                 typeof(BackFlipPatch),
+                typeof (Looker_Start_Patch),
+                typeof(Looker_ToggleLookers_Patch),
 
                 // add/remove patches here easily
             };

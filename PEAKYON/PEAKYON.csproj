@@ -60,6 +60,6 @@
   </ItemGroup>
   
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="copy &quot;$(TargetPath)&quot; &quot;C:\Users\yonij\AppData\Roaming\r2modmanPlus-local\PEAK\profiles\HackerMan\BepInEx\plugins\&quot;" />
+    <Exec Command="copy &quot;$(TargetPath)&quot; &quot;C:\Users\yonij\AppData\Roaming\com.kesomannen.gale\peak\profiles\Default\BepInEx\plugins&quot;" />
   </Target>
 </Project>
