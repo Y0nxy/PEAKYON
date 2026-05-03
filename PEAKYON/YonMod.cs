@@ -47,8 +47,7 @@ namespace PEAKYON
         public static ConfigEntry<float> BugleVolume;
         public static ConfigEntry<float> BuglePitchWobble;
 
-        //BackFlip Success
-        public static ConfigEntry<float> SuccessChance;
+        
         //LookerEnable Config
         public static ConfigEntry<KeyCode> LookerEnableKey;
         public static ConfigEntry<bool> LookerEnable;
@@ -214,8 +213,7 @@ namespace PEAKYON
             BuglePatchEnabled = Config.Bind("Bugle", "Bugle Patch Enabled", true, "Toggle the bugle patch on/off.");
             BuglePatchToggleKey = Config.Bind("Bugle", "Bugle Patch Toggle Key", KeyCode.Backslash, "Key to toggle the bugle patch on/off.");
 
-            SuccessChance = Config.Bind("Emotes", "Backflip Success", 50f,
-                new ConfigDescription("Probability of backflip succeeding (0 - 100)", new AcceptableValueRange<float>(0f, 100f)));
+           
             LookerEnableKey = Config.Bind("Lookers", "Looker Enable Key", KeyCode.L, "Key to not disable all lookers");
             LookerEnable = Config.Bind("Lookers", "Looker Enable", true, "Toggle the lookers on/off.");
         }
@@ -420,38 +418,7 @@ namespace PEAKYON
             }
         }
 
-        [HarmonyPatch(typeof(CharacterAnimations), "PlayEmote")]
-        static class BackFlipPatch
-        {
-            [HarmonyTranspiler]
-            static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-            {
-                var randomValue = AccessTools.Property(typeof(UnityEngine.Random), nameof(UnityEngine.Random.value)).GetGetMethod();
-                var codes = new List<CodeInstruction>(instructions);
-
-                for (int i = 0; i < codes.Count; i++)
-                {
-                    if (codes[i].Calls(randomValue))
-                    {
-                        // remove: Random.value, ldc.r4 0.5, cgt
-                        // replace with just our method call which returns bool directly
-                        codes[i] = new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(BackFlipPatch), nameof(GetSucceeded)));
-                        codes.RemoveAt(i + 1); // remove ldc.r4 0.5
-                        codes.RemoveAt(i + 1); // remove cgt
-                        break;
-                    }
-                }
-
-                return codes;
-            }
-
-            static bool GetSucceeded()
-            {
-                bool succeeded = UnityEngine.Random.value * 100f > SuccessChance.Value;
-                //Notification(succeeded ? "Backflip Failed!" : "Backflip Succeeded!", succeeded ? "FF0000" : "00FF00", true);
-                return succeeded;
-            }
-        }
+        
 
         //[HarmonyPatch(typeof(PropSpawner), "Spawn")]
         //public class PropSpawnerPatch
@@ -507,7 +474,6 @@ namespace PEAKYON
                 typeof(Patch_KickCast_NoStamina),
                 typeof(CharacterGrabbing_Update_Patch),
                 typeof(CurrentItemPatch),
-                typeof(BackFlipPatch),
                 typeof (Looker_Start_Patch),
                 typeof(Looker_ToggleLookers_Patch),
 
